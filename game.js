@@ -1,5 +1,6 @@
 // ==========================================
-// MERGE ARENA — v1.1 (Yandex Games SDK)
+// MERGE ARENA — v1.2
+// Баланс: круче рост, новые враги, главы
 // ==========================================
 
 const canvas = document.getElementById('gameCanvas');
@@ -47,7 +48,7 @@ function showRewardedAd(onReward) {
     isAdShowing = true;
     ysdk.adv.showRewardedVideo({
         callbacks: {
-            onOpen: () => { console.log('Реклама открыта'); },
+            onOpen: () => {},
             onRewarded: () => { onReward(); },
             onClose: () => { isAdShowing = false; },
             onError: (e) => { isAdShowing = false; console.error('Ошибка рекламы:', e); }
@@ -56,7 +57,7 @@ function showRewardedAd(onReward) {
 }
 
 let lastInterstitialTime = 0;
-const INTERSTITIAL_COOLDOWN = 180000; // 3 минуты
+const INTERSTITIAL_COOLDOWN = 180000;
 
 function showInterstitialAd() {
     if (!ysdk || isAdShowing) return;
@@ -120,6 +121,12 @@ function sfxBossKill() {
     setTimeout(() => playTone(440, 0.2, 'sine', 0.08), 300);
     setTimeout(() => playTone(660, 0.5, 'sine', 0.08), 450);
 }
+function sfxChapter() {
+    playTone(392, 0.15, 'sine', 0.07);
+    setTimeout(() => playTone(523, 0.15, 'sine', 0.07), 130);
+    setTimeout(() => playTone(659, 0.15, 'sine', 0.07), 260);
+    setTimeout(() => playTone(784, 0.5, 'sine', 0.07), 390);
+}
 
 // ==========================================
 // КОНСТАНТЫ
@@ -154,12 +161,17 @@ const SHOP_UNITS = [
     { type: 4, price: 200 }
 ];
 
+// ==========================================
+// 👹 ТИПЫ ВРАГОВ (добавлены splitter + healer)
+// ==========================================
 const ENEMY_TYPES = {
-    normal:  { name: 'Обычный',       color: '#ef4444', hpMul: 1,   speedMul: 1,   size: 0.22, resist: 0    },
-    tank:    { name: 'Толстый',       color: '#a855f7', hpMul: 3,   speedMul: 0.5, size: 0.28, resist: 0    },
-    fast:    { name: 'Быстрый',       color: '#facc15', hpMul: 0.5, speedMul: 2.0, size: 0.16, resist: 0    },
-    armored: { name: 'Бронированный', color: '#94a3b8', hpMul: 2,   speedMul: 0.7, size: 0.24, resist: 0.5  },
-    boss:    { name: 'БОСС',          color: '#111827', hpMul: 12,  speedMul: 0.3, size: 0.42, resist: 0.2  }
+    normal:   { name: 'Обычный',       color: '#ef4444', hpMul: 1,   speedMul: 1,   size: 0.22, resist: 0    },
+    tank:     { name: 'Толстый',       color: '#a855f7', hpMul: 3,   speedMul: 0.5, size: 0.28, resist: 0    },
+    fast:     { name: 'Быстрый',       color: '#facc15', hpMul: 0.5, speedMul: 2.0, size: 0.16, resist: 0    },
+    armored:  { name: 'Бронированный', color: '#94a3b8', hpMul: 2,   speedMul: 0.7, size: 0.24, resist: 0.5  },
+    splitter: { name: 'Разделяющийся', color: '#22d3ee', hpMul: 1.5, speedMul: 0.9, size: 0.24, resist: 0    },
+    healer:   { name: 'Целитель',      color: '#10b981', hpMul: 1.8, speedMul: 0.6, size: 0.20, resist: 0.3  },
+    boss:     { name: 'БОСС',          color: '#111827', hpMul: 6,   speedMul: 0.3, size: 0.42, resist: 0.2  }
 };
 
 function getEnemyTypesForWave(w) {
@@ -168,6 +180,8 @@ function getEnemyTypesForWave(w) {
     if (w >= 3) pool.push('tank');
     if (w >= 5) pool.push('fast');
     if (w >= 8) pool.push('armored');
+    if (w >= 12) pool.push('splitter');
+    if (w >= 18) pool.push('healer');
     return pool;
 }
 
@@ -175,21 +189,23 @@ function getEnemyTypesForWave(w) {
 // 🏆 ДОСТИЖЕНИЯ
 // ==========================================
 const ACHIEVEMENTS = [
-    { id: 'firstBlood',    icon: '🩸', name: 'Первая кровь',   desc: 'Убей первого врага',         reward: 5  },
-    { id: 'mergeMaster',   icon: '🥈', name: 'Мерж-мастер',    desc: 'Собери первого Паладина',    reward: 20 },
-    { id: 'generalissimo', icon: '🥇', name: 'Генералиссимус', desc: 'Собери Генерала',            reward: 50 },
-    { id: 'richMan',       icon: '💰', name: 'Богач',          desc: 'Накопи 500 золота',          reward: 25 },
-    { id: 'survivor10',    icon: '🔥', name: 'Выживший',       desc: 'Дойди до 10-й волны',        reward: 30 },
-    { id: 'untouchable',   icon: '🛡️', name: 'Непробиваемый',  desc: 'Пройди волну без потери HP', reward: 15 },
-    { id: 'sniper',        icon: '🎯', name: 'Снайпер',        desc: 'Убей 100 врагов',            reward: 30 },
-    { id: 'comboMaster',   icon: '⚡', name: 'Комбо-мастер',   desc: 'Сделай комбо ×5',            reward: 20 },
-    { id: 'martyr',        icon: '💀', name: 'Мученик',        desc: 'Проиграй первый раз',        reward: 5  },
-    { id: 'shopaholic',    icon: '🛒', name: 'Шопоголик',      desc: 'Купи 10 юнитов',             reward: 15 },
-    { id: 'bossSlayer',    icon: '👑', name: 'Убийца боссов',  desc: 'Убей первого босса',         reward: 40 }
+    { id: 'firstBlood',    icon: '🩸', name: 'Первая кровь',   desc: 'Убей первого врага',         reward: 5   },
+    { id: 'mergeMaster',   icon: '🥈', name: 'Мерж-мастер',    desc: 'Собери первого Паладина',    reward: 20  },
+    { id: 'generalissimo', icon: '🥇', name: 'Генералиссимус', desc: 'Собери Генерала',            reward: 50  },
+    { id: 'richMan',       icon: '💰', name: 'Богач',          desc: 'Накопи 500 золота',          reward: 25  },
+    { id: 'survivor10',    icon: '🔥', name: 'Выживший',       desc: 'Дойди до 10-й волны',        reward: 30  },
+    { id: 'chapter3',      icon: '🏅', name: 'Ветеран',        desc: 'Пройди 3 главы (30 волн)',   reward: 100 },
+    { id: 'chapter5',      icon: '🎖️', name: 'Легенда',        desc: 'Пройди 5 глав (50 волн)',    reward: 250 },
+    { id: 'untouchable',   icon: '🛡️', name: 'Непробиваемый',  desc: 'Пройди волну без потери HP', reward: 15  },
+    { id: 'sniper',        icon: '🎯', name: 'Снайпер',        desc: 'Убей 100 врагов',            reward: 30  },
+    { id: 'comboMaster',   icon: '⚡', name: 'Комбо-мастер',   desc: 'Сделай комбо ×5',            reward: 20  },
+    { id: 'martyr',        icon: '💀', name: 'Мученик',        desc: 'Проиграй первый раз',        reward: 5   },
+    { id: 'shopaholic',    icon: '🛒', name: 'Шопоголик',      desc: 'Купи 10 юнитов',             reward: 15  },
+    { id: 'bossSlayer',    icon: '👑', name: 'Убийца боссов',  desc: 'Убей первого босса',         reward: 40  }
 ];
 
 let unlocked = {};
-let stats = { totalKills: 0, unitsBought: 0, maxCombo: 0, gamesPlayed: 0, bossesKilled: 0 };
+let stats = { totalKills: 0, unitsBought: 0, maxCombo: 0, gamesPlayed: 0, bossesKilled: 0, chaptersCleared: 0 };
 try { unlocked = JSON.parse(localStorage.getItem('mergeArena_achievements') || '{}') || {}; } catch (e) { unlocked = {}; }
 try { stats = Object.assign(stats, JSON.parse(localStorage.getItem('mergeArena_stats') || '{}') || {}); } catch (e) {}
 
@@ -236,19 +252,21 @@ let wave = 0;
 let playerHp = 5;
 const MAX_HP = 5;
 let gold = 0;
-let gameState = 'loading'; // 'loading' | 'idle' | 'wave' | 'gameover'
+let gameState = 'loading';
 let shopOpen = false;
 let achievementsOpen = false;
 let notification = null;
 let bestWave = parseInt(localStorage.getItem('mergeArena_bestWave') || '0', 10);
 let bossWarning = 0;
+let chapterBanner = 0; // показ баннера "Глава пройдена"
 
 let shakeTime = 0, shakeIntensity = 0;
 let screenFlash = 0;
 let combo = 0, comboTimer = 0;
 let hpAtWaveStart = MAX_HP;
+let healerTimer = 0;
 
-let rewardedAdAvailable = true; // можно ли еще смотреть рекламу за награду
+let rewardedAdAvailable = true;
 
 function notify(text, color) { notification = { text, life: 1.5, maxLife: 1.5, color: color || '#e2e8f0' }; }
 function triggerShake(intensity, duration) { shakeIntensity = Math.max(shakeIntensity, intensity); shakeTime = Math.max(shakeTime, duration); }
@@ -274,7 +292,7 @@ function spawnParticles(x, y, color, count, speed, size) {
 function getMainButtons() {
     const gap = 10;
     const totalW = W - 40;
-    const bw = (totalW - gap * 2) / 3; // теперь 3 кнопки
+    const bw = (totalW - gap * 2) / 3;
     const bh = 56;
     const y = 110;
     return {
@@ -295,7 +313,7 @@ function getShopItemRects() {
 }
 function getSoundButton() { return { x: W - 44, y: 6, w: 36, h: 36 }; }
 function getAchievementsButton() { return { x: W - 86, y: 6, w: 36, h: 36 }; }
-function getAchievementsPanel() { const w = Math.min(W - 40, 440); const h = 600; return { x: (W - w) / 2, y: (H - h) / 2, w, h }; }
+function getAchievementsPanel() { const w = Math.min(W - 40, 440); const h = 640; return { x: (W - w) / 2, y: (H - h) / 2, w, h }; }
 function inRect(px, py, r) { return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h; }
 
 // ==========================================
@@ -420,15 +438,12 @@ function triggerRewardedAd() {
     rewardedAdAvailable = false;
     notify('Загружаем рекламу...', '#94a3b8');
     showRewardedAd(() => {
-        // Награда
         gold += 50;
         notify('+50 золота за рекламу!', '#fbbf24');
         playTone(700, 0.1, 'sine', 0.06);
         setTimeout(() => playTone(1000, 0.15, 'sine', 0.06), 100);
-        // Разрешаем снова через 60 секунд
         setTimeout(() => { rewardedAdAvailable = true; }, 60000);
     });
-    // Если рекламы не было (локальный режим) — разрешаем сразу
     if (!ysdk) setTimeout(() => { rewardedAdAvailable = true; }, 30000);
 }
 
@@ -459,8 +474,9 @@ function tryBuy(item) {
 // ==========================================
 function spawnEnemy(typeId, slotIndex, totalSlots) {
     const def = ENEMY_TYPES[typeId];
-    const baseHp = 3 + wave * 2;
-    const baseSpeed = 30 + wave * 4;
+    // 🔥 Новый рост сложности
+    const baseHp = 5 + wave * 3;
+    const baseSpeed = 35 + wave * 5;
     const hp = Math.max(1, Math.round(baseHp * def.hpMul));
     const speed = baseSpeed * def.speedMul;
     const col = Math.floor((slotIndex / totalSlots) * COLS + Math.random() * 0.9) % COLS;
@@ -468,10 +484,12 @@ function spawnEnemy(typeId, slotIndex, totalSlots) {
         typeId: typeId, col: col,
         y: GRID_Y - 40 - Math.random() * 100,
         hp: hp, maxHp: hp, speed: speed,
+        baseHp: baseHp, baseSpeed: baseSpeed,
         hitFlash: 0, spawnProgress: 0,
         isBoss: typeId === 'boss'
     });
 }
+
 function startWave() {
     wave++;
     gameState = 'wave';
@@ -479,6 +497,7 @@ function startWave() {
     hpAtWaveStart = playerHp;
     sfxWaveStart();
     if (wave >= 10) checkAchievement('survivor10');
+
     const typesPool = getEnemyTypesForWave(wave);
     if (wave % 10 === 0) {
         spawnEnemy('boss', 2, 5);
@@ -493,13 +512,14 @@ function startWave() {
         }
     }
 }
+
 function restart() {
     enemies = []; bullets = []; flashes = []; floaters = [];
     particles = []; damageNumbers = []; achievementPopups = [];
     wave = 0; playerHp = MAX_HP; gold = 0;
     gameState = 'idle'; shopOpen = false; achievementsOpen = false;
     notification = null; combo = 0; comboTimer = 0; screenFlash = 0;
-    bossWarning = 0;
+    bossWarning = 0; chapterBanner = 0;
     resetGrid();
 }
 function goldForKill(e) { let base = 2 + Math.floor(wave / 3); if (e && e.isBoss) base *= 10; return base; }
@@ -514,6 +534,7 @@ function update(dt) {
     if (screenFlash > 0) screenFlash = Math.max(0, screenFlash - dt * 3);
     if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
     if (bossWarning > 0) bossWarning -= dt;
+    if (chapterBanner > 0) chapterBanner -= dt;
 
     for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].life -= dt; if (flashes[i].life <= 0) flashes.splice(i, 1); }
     for (let i = floaters.length - 1; i >= 0; i--) {
@@ -551,6 +572,26 @@ function update(dt) {
 
     if (gameState !== 'wave') return;
 
+    // 🩺 Лечение от целителей (раз в секунду)
+    healerTimer -= dt;
+    if (healerTimer <= 0) {
+        healerTimer = 1;
+        for (const healer of enemies) {
+            if (healer.typeId !== 'healer') continue;
+            for (const e of enemies) {
+                if (e === healer) continue;
+                if (Math.abs(e.col - healer.col) <= 1 && Math.abs(e.y - healer.y) < CELL_SIZE * 1.5) {
+                    if (e.hp < e.maxHp) {
+                        e.hp = Math.min(e.maxHp, e.hp + 4);
+                        // визуальный пульс лечения
+                        flashes.push({ x: GRID_X + e.col * CELL_SIZE + CELL_SIZE / 2, y: e.y, life: 0.4, maxLife: 0.4, color: '#10b981', size: CELL_SIZE * 0.3 });
+                    }
+                }
+            }
+        }
+    }
+
+    // Враги вниз
     for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         e.y += e.speed * dt;
@@ -573,6 +614,7 @@ function update(dt) {
         }
     }
 
+    // Стрельба юнитов
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             const unit = grid[r][c];
@@ -603,6 +645,7 @@ function update(dt) {
         }
     }
 
+    // Пули
     for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.x += b.vx * dt; b.y += b.vy * dt;
@@ -631,6 +674,24 @@ function update(dt) {
                 const idx = enemies.indexOf(killed);
                 if (idx >= 0) enemies.splice(idx, 1);
 
+                // 🩵 РАЗДЕЛЯЮЩИЙСЯ — спавнит двух быстрых
+                if (killed.typeId === 'splitter') {
+                    const childHp = Math.max(1, Math.round(killed.baseHp * ENEMY_TYPES.fast.hpMul * 0.6));
+                    for (let k = 0; k < 2; k++) {
+                        const childCol = Math.max(0, Math.min(COLS - 1, killed.col + (k === 0 ? -1 : 1)));
+                        enemies.push({
+                            typeId: 'fast', col: childCol,
+                            y: killed.y - k * 8,
+                            hp: childHp, maxHp: childHp,
+                            speed: killed.baseSpeed * ENEMY_TYPES.fast.speedMul,
+                            baseHp: killed.baseHp, baseSpeed: killed.baseSpeed,
+                            hitFlash: 0, spawnProgress: 1,
+                            isBoss: false
+                        });
+                    }
+                    spawnParticles(eX, eY, '#22d3ee', 20, 250, 4);
+                }
+
                 combo++;
                 comboTimer = 2.0;
                 if (combo > stats.maxCombo) { stats.maxCombo = combo; saveProgress(); if (combo >= 5) checkAchievement('comboMaster'); }
@@ -649,6 +710,10 @@ function update(dt) {
                     stats.bossesKilled++;
                     saveProgress();
                     checkAchievement('bossSlayer');
+                } else if (killed.typeId === 'healer') {
+                    sfxKill();
+                    triggerShake(3, 0.15);
+                    spawnParticles(eX, eY, '#10b981', 15, 250, 4);
                 } else {
                     sfxKill();
                     triggerShake(4, 0.18);
@@ -671,7 +736,21 @@ function update(dt) {
     if (enemies.length === 0) {
         gameState = 'idle';
         if (playerHp === hpAtWaveStart && wave >= 2) checkAchievement('untouchable');
-        // Показ межстраничной рекламы между волнами (не чаще 3 мин)
+
+        // 🏅 НАГРАДА ЗА ГЛАВУ (каждые 10 волн)
+        if (wave > 0 && wave % 10 === 0) {
+            const chapterNum = wave / 10;
+            const chapterBonus = 80 + chapterNum * 40;
+            gold += chapterBonus;
+            stats.chaptersCleared = Math.max(stats.chaptersCleared, chapterNum);
+            saveProgress();
+            sfxChapter();
+            chapterBanner = 4.0;
+            notify('🏅 Глава ' + chapterNum + ' пройдена! +' + chapterBonus + '💰', '#fbbf24');
+            if (chapterNum >= 3) checkAchievement('chapter3');
+            if (chapterNum >= 5) checkAchievement('chapter5');
+        }
+
         setTimeout(() => showInterstitialAd(), 300);
     }
 }
@@ -692,7 +771,6 @@ function roundRect(x, y, w, h, r) {
 function render(time) {
     CELL_SIZE = calcGrid();
 
-    // === ЗАГРУЗОЧНЫЙ ЭКРАН ===
     if (gameState === 'loading') {
         ctx.fillStyle = '#16213e';
         ctx.fillRect(0, 0, W, H);
@@ -704,7 +782,6 @@ function render(time) {
         ctx.fillStyle = '#94a3b8';
         ctx.font = '18px Arial';
         ctx.fillText('Загрузка...', W / 2, H / 2 + 10);
-        // Прогресс-бар
         const barW = W * 0.6, barH = 8;
         const barX = (W - barW) / 2, barY = H / 2 + 50;
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
@@ -829,7 +906,7 @@ function render(time) {
     ctx.fillStyle = '#fbbf24';
     const goldText = '💰 ' + gold;
     const bestText = '🏆 ' + bestWave;
-    const waveText = '⚔️ Волна ' + wave;
+    const waveText = '⚔️ Волна ' + wave + (wave > 0 ? ' (Гл.' + Math.ceil(wave/10) + ')' : '');
     const totalW = ctx.measureText(goldText).width + ctx.measureText(bestText).width + ctx.measureText(waveText).width + 40;
     let curX = (W - totalW) / 2;
     ctx.textAlign = 'left';
@@ -843,7 +920,6 @@ function render(time) {
         const btns = getMainButtons();
         const pulse = 1 + Math.sin(time * 0.005) * 0.03;
 
-        // 🎁 Реклама за награду
         ctx.fillStyle = rewardedAdAvailable ? '#f59e0b' : '#475569';
         roundRect(btns.ad.x, btns.ad.y, btns.ad.w, btns.ad.h, 12); ctx.fill();
         ctx.fillStyle = '#ffffff';
@@ -851,14 +927,12 @@ function render(time) {
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('🎁 +50💰', btns.ad.x + btns.ad.w / 2, btns.ad.y + btns.ad.h / 2);
 
-        // Магазин
         ctx.fillStyle = '#3b82f6';
         roundRect(btns.shop.x, btns.shop.y, btns.shop.w, btns.shop.h, 12); ctx.fill();
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 15px Arial';
         ctx.fillText('🛒 МАГАЗИН', btns.shop.x + btns.shop.w / 2, btns.shop.y + btns.shop.h / 2);
 
-        // Старт
         const sW = btns.start.w * pulse, sH = btns.start.h * pulse;
         const sX = btns.start.x - (sW - btns.start.w) / 2;
         const sY = btns.start.y - (sH - btns.start.h) / 2;
@@ -901,6 +975,25 @@ function render(time) {
         ctx.fillStyle = '#fca5a5';
         ctx.font = 'bold 14px Arial';
         ctx.fillText('Приготовься!', W / 2, H / 2 + 18);
+        ctx.globalAlpha = 1;
+    }
+
+    if (chapterBanner > 0) {
+        const k = Math.min(1, chapterBanner / 0.5);
+        ctx.globalAlpha = k;
+        ctx.fillStyle = 'rgba(15,23,42,0.9)';
+        const bw = Math.min(W - 40, 380);
+        const bh = 100;
+        roundRect((W - bw) / 2, H / 2 - bh / 2, bw, bh, 16); ctx.fill();
+        ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3;
+        roundRect((W - bw) / 2, H / 2 - bh / 2, bw, bh, 16); ctx.stroke();
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 30px Arial';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('🏅 ГЛАВА ' + Math.floor(wave/10) + ' ПРОЙДЕНА!', W / 2, H / 2 - 15);
+        ctx.fillStyle = '#22c55e';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText('+' + (80 + Math.floor(wave/10) * 40) + ' 💰', W / 2, H / 2 + 25);
         ctx.globalAlpha = 1;
     }
 
@@ -1005,19 +1098,13 @@ function drawShop() {
         roundRect(r.x, r.y, r.w, r.h, 10); ctx.fill();
         ctx.strokeStyle = canBuy ? '#22c55e' : '#475569'; ctx.lineWidth = 1.5;
         roundRect(r.x, r.y, r.w, r.h, 10); ctx.stroke();
-
-        const miniX = r.x + 8;
-        const miniY = r.y + 6;
-        const miniSize = 58;
         const fakeUnit = { type: item.type, recoil: 0 };
-        drawUnitAt(miniX, miniY, miniSize, fakeUnit, 1, performance.now());
-
+        drawUnitAt(r.x + 8, r.y + 6, 58, fakeUnit, 1, performance.now());
         ctx.textAlign = 'left';
         ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 17px Arial';
         ctx.fillText(t.name, r.x + 78, r.y + 26);
         ctx.fillStyle = canBuy ? '#fbbf24' : '#64748b'; ctx.font = 'bold 15px Arial';
         ctx.fillText('💰 ' + item.price, r.x + 78, r.y + 50);
-
         ctx.fillStyle = canBuy ? '#22c55e' : '#334155';
         const bx = r.x + r.w - 100, by = r.y + 15, bw = 80, bh = 40;
         roundRect(bx, by, bw, bh, 8); ctx.fill();
@@ -1052,7 +1139,7 @@ function drawAchievements() {
 
     const pad = 14;
     const startY = p.y + 82;
-    const rowH = 42;
+    const rowH = 40;
     for (let i = 0; i < ACHIEVEMENTS.length; i++) {
         const a = ACHIEVEMENTS[i];
         const y = startY + i * rowH;
@@ -1062,17 +1149,17 @@ function drawAchievements() {
         ctx.strokeStyle = isUnlocked ? 'rgba(34,197,94,0.5)' : 'rgba(255,255,255,0.08)';
         ctx.lineWidth = 1;
         roundRect(p.x + pad, y, p.w - pad * 2, rowH - 4, 8); ctx.stroke();
-        ctx.font = '20px Arial';
+        ctx.font = '18px Arial';
         ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
         ctx.globalAlpha = isUnlocked ? 1 : 0.35;
         ctx.fillText(a.icon, p.x + pad + 10, y + (rowH - 4) / 2);
         ctx.globalAlpha = 1;
         ctx.fillStyle = isUnlocked ? '#e2e8f0' : '#64748b';
         ctx.font = 'bold 13px Arial';
-        ctx.fillText(a.name, p.x + pad + 44, y + 13);
+        ctx.fillText(a.name, p.x + pad + 42, y + 12);
         ctx.fillStyle = isUnlocked ? '#94a3b8' : '#475569';
         ctx.font = '10px Arial';
-        ctx.fillText(a.desc, p.x + pad + 44, y + 28);
+        ctx.fillText(a.desc, p.x + pad + 42, y + 27);
         ctx.textAlign = 'right';
         if (isUnlocked) {
             ctx.fillStyle = '#22c55e'; ctx.font = 'bold 12px Arial';
@@ -1091,7 +1178,7 @@ function drawGameOver() {
     ctx.fillStyle = '#ef4444'; ctx.font = 'bold 40px Arial';
     ctx.fillText('ИГРА ОКОНЧЕНА', W / 2, H / 2 - 140);
     ctx.fillStyle = '#e2e8f0'; ctx.font = '20px Arial';
-    ctx.fillText('Дошёл до волны ' + wave, W / 2, H / 2 - 70);
+    ctx.fillText('Дошёл до волны ' + wave + ' (Глава ' + Math.ceil(wave/10) + ')', W / 2, H / 2 - 70);
     ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 22px Arial';
     ctx.fillText('Заработал: ' + gold + ' 💰', W / 2, H / 2 - 30);
     ctx.fillStyle = '#a78bfa'; ctx.font = 'bold 18px Arial';
@@ -1106,6 +1193,9 @@ function drawGameOver() {
     ctx.fillText('чтобы начать заново', W / 2, H / 2 + 150);
 }
 
+// ==========================================
+// 👹 ВРАГИ (новые: splitter, healer)
+// ==========================================
 function drawEnemy(e) {
     const def = ENEMY_TYPES[e.typeId] || ENEMY_TYPES.normal;
     const cx = GRID_X + e.col * CELL_SIZE + CELL_SIZE / 2;
@@ -1157,6 +1247,52 @@ function drawEnemy(e) {
         ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1.5; ctx.stroke();
         ctx.fillStyle = flash > 0 ? '#ffffff' : '#64748b';
         ctx.beginPath(); ctx.arc(cx, cy, radius * 0.6, 0, Math.PI * 2); ctx.fill();
+    } else if (e.typeId === 'splitter') {
+        // Ромб с "трещиной"
+        ctx.shadowColor = def.color;
+        ctx.shadowBlur = flash > 0 ? 25 : 14;
+        ctx.fillStyle = baseColor;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - radius);
+        ctx.lineTo(cx + radius, cy);
+        ctx.lineTo(cx, cy + radius);
+        ctx.lineTo(cx - radius, cy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+        // Трещина по центру (вертикальная)
+        ctx.strokeStyle = '#0e7490';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - radius * 0.7);
+        ctx.lineTo(cx - 2, cy - radius * 0.2);
+        ctx.lineTo(cx + 2, cy + radius * 0.2);
+        ctx.lineTo(cx, cy + radius * 0.7);
+        ctx.stroke();
+    } else if (e.typeId === 'healer') {
+        // Зелёный круг с крестом
+        const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.08;
+        ctx.shadowColor = def.color;
+        ctx.shadowBlur = flash > 0 ? 25 : 16;
+        // Аура
+        ctx.globalAlpha = scale * 0.4;
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath(); ctx.arc(cx, cy, radius * 1.5 * pulse, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = scale;
+        // Тело
+        ctx.fillStyle = baseColor;
+        ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
+        // Крест
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 6;
+        const cw = radius * 0.25, ch = radius * 0.9;
+        ctx.fillRect(cx - cw / 2, cy - ch / 2, cw, ch);
+        ctx.fillRect(cx - ch / 2, cy - cw / 2, ch, cw);
+        ctx.shadowBlur = 0;
     } else if (e.typeId === 'boss') {
         ctx.shadowColor = '#ef4444';
         ctx.shadowBlur = flash > 0 ? 30 : 22;
@@ -1216,16 +1352,13 @@ function drawUnitAt(x, y, size, unit, alpha, time) {
     const recoilOffsetY = recoilK * 4;
     const recoilSquash = 1 - recoilK * 0.08;
     ctx.globalAlpha = alpha;
-
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.beginPath();
     ctx.ellipse(x + size / 2, y + size - 8, size * 0.28, size * 0.08, 0, 0, Math.PI * 2);
     ctx.fill();
-
     const cx = x + size / 2;
     const cy = y + size / 2 + recoilOffsetY;
     const radius = size * 0.34 * breathe * recoilSquash;
-
     const grad = ctx.createRadialGradient(cx, cy - radius * 0.4, radius * 0.2, cx, cy, radius);
     grad.addColorStop(0, '#ffffff');
     grad.addColorStop(0.35, t.color);
@@ -1233,12 +1366,10 @@ function drawUnitAt(x, y, size, unit, alpha, time) {
     ctx.fillStyle = grad;
     ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.stroke();
-
     if (type === 1) drawSwordsman(cx, cy, radius, t);
     else if (type === 2) drawKnight(cx, cy, radius, t);
     else if (type === 3) drawPaladin(cx, cy, radius, t, time);
     else if (type === 4) drawGeneral(cx, cy, radius, t, time);
-
     if (recoilK > 0.4) {
         ctx.globalAlpha = alpha * (recoilK - 0.4) / 0.6;
         ctx.strokeStyle = '#fffbb0';
@@ -1262,7 +1393,6 @@ function drawSwordsman(cx, cy, radius, t) {
     ctx.fillStyle = '#6b7280';
     ctx.fillRect(-6, -2, 12, 3);
     ctx.restore();
-
     ctx.fillStyle = '#94a3b8';
     ctx.beginPath();
     ctx.arc(cx - radius * 0.7, cy, radius * 0.45, 0, Math.PI * 2);
@@ -1290,12 +1420,10 @@ function drawKnight(cx, cy, radius, t) {
     ctx.moveTo(cx + radius * 0.5, cy - radius * 0.5);
     ctx.quadraticCurveTo(cx + radius * 1.1, cy - radius * 1.1, cx + radius * 0.7, cy - radius * 1.4);
     ctx.stroke();
-
     ctx.fillStyle = 'rgba(15,23,42,0.85)';
     ctx.beginPath();
     ctx.ellipse(cx, cy + radius * 0.05, radius * 0.7, radius * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.strokeStyle = '#93c5fd';
     ctx.lineWidth = 1.5;
     for (let i = -1; i <= 1; i++) {
@@ -1304,7 +1432,6 @@ function drawKnight(cx, cy, radius, t) {
         ctx.lineTo(cx + radius * 0.55, cy + radius * 0.05 + i * radius * 0.18);
         ctx.stroke();
     }
-
     ctx.fillStyle = '#3b82f6';
     ctx.beginPath();
     ctx.moveTo(cx, cy + radius * 0.6);
@@ -1326,7 +1453,6 @@ function drawPaladin(cx, cy, radius, t, time) {
     ctx.ellipse(cx, cy - radius * 1.1, radius * 0.7 * haloPulse, radius * 0.18, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.shadowBlur = 0;
-
     ctx.fillStyle = '#fde68a';
     ctx.shadowColor = '#fde68a';
     ctx.shadowBlur = 8;
@@ -1335,7 +1461,6 @@ function drawPaladin(cx, cy, radius, t, time) {
     ctx.fillRect(cx - crossW / 2, cy - crossH * 0.4, crossW, crossH);
     ctx.fillRect(cx - crossH * 0.25, cy - crossW / 2 - radius * 0.05, crossH * 0.5, crossW);
     ctx.shadowBlur = 0;
-
     ctx.fillStyle = 'rgba(139,92,246,0.6)';
     ctx.beginPath();
     ctx.moveTo(cx - radius * 0.9, cy);
@@ -1355,11 +1480,9 @@ function drawGeneral(cx, cy, radius, t, time) {
     ctx.lineTo(cx + radius * 1.05, cy - radius * 0.3);
     ctx.closePath();
     ctx.fill();
-
     ctx.fillStyle = '#fbbf24';
     ctx.beginPath(); ctx.arc(cx - radius * 0.65, cy + radius * 0.4, radius * 0.16, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + radius * 0.65, cy + radius * 0.4, radius * 0.16, 0, Math.PI * 2); ctx.fill();
-
     const crownY = cy - radius * 0.85;
     const crownW = radius * 1.3;
     ctx.fillStyle = '#fbbf24';
@@ -1376,7 +1499,6 @@ function drawGeneral(cx, cy, radius, t, time) {
     ctx.closePath();
     ctx.fill();
     ctx.shadowBlur = 0;
-
     const starPulse = 1 + Math.sin(time * 0.005) * 0.15;
     drawStar(cx, cy + radius * 0.05, radius * 0.35 * starPulse, radius * 0.18, 5, '#fbbf24');
 }
@@ -1409,7 +1531,7 @@ window.addEventListener('focus', () => {
 });
 
 // ==========================================
-// ГЛАВНЫЙ ЦИКЛ И СТАРТ
+// ГЛАВНЫЙ ЦИКЛ
 // ==========================================
 let lastFrame = 0;
 function loop(time) {
