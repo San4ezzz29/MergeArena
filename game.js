@@ -161,7 +161,17 @@ let dragging = null;
 
 function getPointer(e) {
     const rect = canvas.getBoundingClientRect();
-    const t = e.touches ? e.touches[0] : e;
+    let t;
+    if (e.touches && e.touches.length > 0) {
+        // Есть активные касания (touchstart, touchmove)
+        t = e.touches[0];
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+        // Палец только что отпущен (touchend) — координаты тут
+        t = e.changedTouches[0];
+    } else {
+        // Мышь или иное устройство
+        t = e;
+    }
     return { x: t.clientX - rect.left, y: t.clientY - rect.top };
 }
 function pickCell(px, py) {
